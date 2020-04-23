@@ -60,8 +60,30 @@ public class ServerManager {
 		}
 	}
 
-	public void openServer(String type, Consumer<Server> then) {
-		// TODO
+	/**
+	 * Find an optimal VPS and call
+	 * {@link VPS#openServer(String, Consumer, Runnable)} on this VPS<br />
+	 * If no vps has been found or type is not a valid type, call error variable
+	 * 
+	 * @param type
+	 * @param then
+	 * @param error
+	 */
+	public void openServer(String type, Consumer<Server> then, Consumer<Error> error) {
+		// Check if type is a valid type
+		if (!Main.get().getServerConfigManager().exist(type)) {
+			LOG.error(Error.TYPENOTFOUND.getError(), type);
+			error.accept(Error.TYPENOTFOUND);
+			return;
+		}
+		// Find an optimal VPS
+		VPS vps = findOptimalVPS();
+		if (vps == null) {
+			LOG.error(Error.FULL.getError(), type);
+			error.accept(Error.FULL);
+			return;
+		}
+		vps.openServer(type, then, error);
 	}
 
 	public void closeServer(String id) {

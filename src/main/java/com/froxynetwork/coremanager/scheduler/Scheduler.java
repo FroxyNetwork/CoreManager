@@ -57,6 +57,13 @@ public class Scheduler {
 	 */
 	public static void stop() {
 		stop = true;
+		for (CustomScheduler cs : execute)
+			if (cs.getError() != null)
+				try {
+					cs.getError().run();
+				} catch (Exception ex) {
+					// Empty exception
+				}
 		execute.clear();
 		// Copy the runnable to avoid
 		Thread copyRunnable = runnable;

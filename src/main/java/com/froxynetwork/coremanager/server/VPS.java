@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.froxynetwork.coremanager.scheduler.Scheduler;
 import com.froxynetwork.coremanager.websocket.WebSocketServerImpl;
 
 import lombok.Getter;
@@ -69,8 +70,15 @@ public class VPS {
 		return servers.get(id);
 	}
 
-	public void openServer(String type, Consumer<Server> then) {
-		// TODO
+	public void openServer(String type, Consumer<Server> then, Consumer<Error> error) {
+		// Check if there is a WebSocket connection
+		if (!isLinked()) {
+			Scheduler.add(() -> true, null);
+		}
+	}
+	
+	private boolean _openServer(String type, Consumer<Server> then, Consumer<Error> error) {
+		
 	}
 
 	public void closeServer(String id) {
@@ -82,12 +90,16 @@ public class VPS {
 	 * 1 + number of servers + (2 * number of temp servers)<br />
 	 * <b>2 * number of temp servers</b> is used to avoid creating a lot of servers
 	 * at the same time for the same machine<br />
-	 * 1 is to avoid returning 0 if there is not servers running on this vps
+	 * We add 1 to avoid returning 0 if there is not servers running on this vps<br />
+	 * Returns 0 if VPS is full or there is not WebSocket connection
 	 * 
-	 * @return number of servers + 2 * number of temp servers
+	 * @return 1 + number of servers + 2 * number of temp servers
 	 */
 	public int getScore() {
-		if (servers.size() >= maxServers)
+		if ((servers.size() + tempServers.size()) >= maxServers)
+			return 0;
+		// Do not create a new server if it's not linked
+		if (!isLinked())
 			return 0;
 		return 1 + servers.size() + 2 * tempServers.size();
 	}

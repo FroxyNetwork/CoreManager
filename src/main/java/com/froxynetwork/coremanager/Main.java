@@ -12,7 +12,6 @@ import com.froxynetwork.coremanager.server.ServerManager;
 import com.froxynetwork.coremanager.server.config.ServerConfigManager;
 import com.froxynetwork.coremanager.websocket.WebSocketManager;
 import com.froxynetwork.froxynetwork.network.NetworkManager;
-import com.froxynetwork.servermanager.command.CommandManager;
 
 import lombok.Getter;
 
@@ -94,7 +93,7 @@ public class Main {
 				// Initialize Servers once ServerConfig is initialized
 				initializeServer();
 				initializeWebSocket();
-				initializeCommands();
+//				initializeCommands();
 				LOG.info("All initialized");
 			});
 		} catch (Exception ex) {
@@ -160,12 +159,12 @@ public class Main {
 		webSocketManager.start();
 		LOG.info("WebSocket initialized");
 	}
-
-	private void initializeCommands() {
-		LOG.info("Initializing CommandManager");
-		commandManager = new CommandManager();
-		LOG.info("CommandManager initialized");
-	}
+//
+//	private void initializeCommands() {
+//		LOG.info("Initializing CommandManager");
+//		commandManager = new CommandManager();
+//		LOG.info("CommandManager initialized");
+//	}
 
 	public static Main get() {
 		return INSTANCE;
