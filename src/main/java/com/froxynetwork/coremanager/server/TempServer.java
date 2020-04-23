@@ -1,6 +1,9 @@
 package com.froxynetwork.coremanager.server;
 
+import java.util.UUID;
 import java.util.function.Consumer;
+
+import lombok.Getter;
 
 /**
  * MIT License
@@ -32,22 +35,16 @@ import java.util.function.Consumer;
  * execute once this server is created)
  */
 public class TempServer {
-	private String tempId;
+	@Getter
+	private UUID uuid;
+	@Getter
 	private String type;
 	private Consumer<Server> then;
 
-	public TempServer(String tempId, String type, Consumer<Server> then) {
-		this.tempId = tempId;
+	public TempServer(UUID uuid, String type, Consumer<Server> then) {
+		this.uuid = uuid;
 		this.type = type;
 		this.then = then;
-	}
-
-	public String getTempId() {
-		return tempId;
-	}
-
-	public String getType() {
-		return type;
 	}
 
 	public void then(Server srv) {

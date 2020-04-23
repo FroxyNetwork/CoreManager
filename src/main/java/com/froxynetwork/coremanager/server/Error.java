@@ -27,7 +27,9 @@ package com.froxynetwork.coremanager.server;
  */
 public enum Error {
 	TYPENOTFOUND(1, "Type {} doesn't exist"), //
-	FULL(2, "Cannot find an optimal VPS to open a server with type = {}");
+	FULL(2, "Cannot find an optimal VPS to open a server with type = {}"), //
+	NOTCONNECTED(3, "VPS {} is not connected via WebSocket"), //
+	UNKNOWN(4, "Unknown error for VPS {}");
 
 	private int id;
 	private String error;

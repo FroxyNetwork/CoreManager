@@ -1,6 +1,7 @@
 package com.froxynetwork.coremanager.server;
 
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -51,7 +52,7 @@ public class VPS {
 	@Getter
 	private int maxServers;
 	private HashMap<String, Server> servers;
-	private HashMap<String, TempServer> tempServers;
+	private HashMap<UUID, TempServer> tempServers;
 	private boolean close;
 	@Setter
 	private WebSocketServerImpl webSocket;
@@ -70,27 +71,50 @@ public class VPS {
 		return servers.get(id);
 	}
 
-	public void openServer(String type, Consumer<Server> then, Consumer<Error> error) {
-		// Check if there is a WebSocket connection
-		if (!isLinked()) {
-			Scheduler.add(() -> true, null);
-		}
-	}
-	
-	private boolean _openServer(String type, Consumer<Server> then, Consumer<Error> error) {
-		
+	public void openServer(String type, Consumer<Server> then, Runnable error) {
+		// Run _openServer every seconds until the action is executed
+		Scheduler.add(() -> _openServer(type, then) == null, error);
 	}
 
-	public void closeServer(String id) {
-		// TODO
+	private Error _openServer(String type, Consumer<Server> then) {
+		if (!isLinked()) {
+			LOG.error(Error.NOTCONNECTED.getError(), id);
+			return Error.NOTCONNECTED;
+		}
+		// Generate unique id
+		UUID randomUUID = UUID.randomUUID();
+		// In theory, this is not possible but we check to be sure
+		while (tempServers.containsKey(randomUUID))
+			randomUUID = UUID.randomUUID();
+		// Save
+		TempServer ts = new TempServer(randomUUID, type, then);
+		tempServers.put(randomUUID, ts);
+		// Send message to VPS
+		sendMessage("start", randomUUID.toString() + " " + type);
+		return null;
+	}
+
+	public void closeServer(String id, Runnable error) {
+		Scheduler.add(() -> _closeServer(id) == null, error);
+	}
+
+	private Error _closeServer(String id) {
+		if (!isLinked()) {
+			LOG.error(Error.NOTCONNECTED.getError(), id);
+			return Error.NOTCONNECTED;
+		}
+		// Send message to VPS
+		sendMessage("stop", id);
+		return null;
 	}
 
 	/**
-	 * Return the score of this VPS or 0 if full<br />
+	 * Return the score of this VPS or 0<br />
 	 * 1 + number of servers + (2 * number of temp servers)<br />
 	 * <b>2 * number of temp servers</b> is used to avoid creating a lot of servers
 	 * at the same time for the same machine<br />
-	 * We add 1 to avoid returning 0 if there is not servers running on this vps<br />
+	 * We add 1 to avoid returning 0 if there is not servers running on this
+	 * vps<br />
 	 * Returns 0 if VPS is full or there is not WebSocket connection
 	 * 
 	 * @return 1 + number of servers + 2 * number of temp servers
@@ -109,8 +133,19 @@ public class VPS {
 	 * 
 	 * @param message The message to send
 	 */
-	public void sendMessage(String message) {
-		// TODO
+	public void sendMessage(String channel, String message) {
+		Scheduler.add(() -> {
+			if (!isLinked())
+				return false;
+			try {
+				webSocket.sendMessage("CORE", channel, message);
+			} catch (Exception ex) {
+				LOG.error("Error while sending a message to VPS {} with channel {}", id, channel);
+				LOG.error("", ex);
+				return false;
+			}
+			return true;
+		}, null);
 	}
 
 	/**
@@ -122,8 +157,25 @@ public class VPS {
 		// TODO
 	}
 
+	/**
+	 * Check if this VPS is linked with the CoreManager
+	 * 
+	 * @return true if there is a WebSocket connection between the CoreManager and
+	 *         this VPS
+	 */
 	public boolean isLinked() {
 		return webSocket != null && webSocket.isConnected();
+	}
+
+	/**
+	 * Check if specific id is linked to a registered server and this server is
+	 * linked with this VPS
+	 * 
+	 * @param id The id of the server to check
+	 * @return true if this id is linked to a server that is in this VPS
+	 */
+	public boolean has(String id) {
+		return servers.containsKey(id);
 	}
 
 	/**

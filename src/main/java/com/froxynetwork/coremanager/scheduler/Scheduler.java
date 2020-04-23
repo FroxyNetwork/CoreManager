@@ -43,13 +43,18 @@ public class Scheduler {
 
 	/**
 	 * Execute an action every seconds until the action is correctly executed.<br />
-	 * If Scheduler is stopped (by a reload or something else), error is called
+	 * If Scheduler is stopped (by a reload or something else), error is
+	 * called<br />
+	 * When you call this method, the action is directly executed and saved if the
+	 * action fail
 	 * 
 	 * @param exec  The action to execute
 	 * @param error The action to execute if Scheduler is stopped
 	 */
 	public static void add(Supplier<Boolean> exec, Runnable error) {
-		execute.add(new CustomScheduler(exec, error));
+		boolean b = exec.get();
+		if (!b)
+			execute.add(new CustomScheduler(exec, error));
 	}
 
 	/**
@@ -79,6 +84,9 @@ public class Scheduler {
 	}
 
 	public static void start() {
+		// Avoid starting when already running
+		if (!stop)
+			return;
 		stop = false;
 		execute = new ArrayList<>();
 		runnable = new Thread(() -> {
@@ -89,7 +97,9 @@ public class Scheduler {
 					ex.printStackTrace();
 				}
 				List<CustomScheduler> execute = new ArrayList<>();
-				for (CustomScheduler cs : Scheduler.execute)
+				// To avoid ConcurrentModificationException
+				List<CustomScheduler> copy = new ArrayList<>(Scheduler.execute);
+				for (CustomScheduler cs : copy)
 					try {
 						if (!cs.getExec().get())
 							execute.add(cs);

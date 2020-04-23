@@ -83,11 +83,20 @@ public class ServerManager {
 			error.accept(Error.FULL);
 			return;
 		}
-		vps.openServer(type, then, error);
+		vps.openServer(type, then, () -> {
+			LOG.info("Unknown error while opening server type {} on vps {}", type, vps.getId());
+			error.accept(Error.UNKNOWN);
+		});
 	}
 
-	public void closeServer(String id) {
-		// TODO
+	public void closeServer(String id, Runnable error) {
+		// Find which vps has this id
+		for (VPS v : this.vps.values())
+			if (v.has(id))
+				v.closeServer(id, () -> {
+					LOG.error("Unknown error while closing server {} on vps {}", id, v.getId());
+					error.run();
+				});
 	}
 
 	/**
