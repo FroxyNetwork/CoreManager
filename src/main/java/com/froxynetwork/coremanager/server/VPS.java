@@ -7,8 +7,14 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.froxynetwork.coremanager.Main;
 import com.froxynetwork.coremanager.scheduler.Scheduler;
-import com.froxynetwork.coremanager.websocket.WebSocketServerImpl;
+import com.froxynetwork.coremanager.server.config.ServerConfig;
+import com.froxynetwork.coremanager.server.config.ServerVps;
+import com.froxynetwork.froxynetwork.network.output.Callback;
+import com.froxynetwork.froxynetwork.network.output.RestException;
+import com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput;
+import com.froxynetwork.froxynetwork.network.websocket.WebSocketServerImpl;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -45,26 +51,64 @@ public class VPS {
 	private final Logger LOG = LoggerFactory.getLogger(getClass());
 	@Getter
 	private String id;
-	@Getter
-	private String url;
-	@Getter
-	private int port;
-	@Getter
-	private int maxServers;
+	private ServerVps vps;
 	private HashMap<String, Server> servers;
 	private HashMap<UUID, TempServer> tempServers;
 	private boolean close;
+	@Getter
 	@Setter
 	private WebSocketServerImpl webSocket;
 
-	public VPS(String id, String url, int port, int maxServers) {
-		this.id = id;
-		this.url = url;
-		this.port = port;
-		this.maxServers = maxServers;
+	private Thread vpsThread;
+
+	public VPS(ServerVps vps) {
+		this.id = vps.getId();
+		this.vps = vps;
 		servers = new HashMap<>();
 		tempServers = new HashMap<>();
 		this.close = false;
+		vpsThread = new Thread(() -> {
+			// This thread will start servers if there is not required servers
+			// Limit at 5 starts every 10 seconds
+			int limit = 5;
+			while (!close) {
+				try {
+					// Sleep 10 seconds
+					Thread.sleep(1000 * 10);
+				} catch (InterruptedException ex) {
+					LOG.info("Got an interruptedException");
+					break;
+				}
+//				// Check if the maximum amount of running server has been reached
+//				if (vps.getMaxServers() >= (servers.size() + tempServers.size()))
+//					continue;
+				int nbr = 0;
+				for (ServerConfig sc : Main.get().getServerConfigManager().getAll()) {
+					if (nbr >= limit)
+						break;
+					String type = sc.getType();
+					int min = sc.getMin();
+					int amount = 0;
+					for (Server srv : servers.values())
+						if (srv.getType().equalsIgnoreCase(type))
+							amount++;
+					for (TempServer srv : tempServers.values())
+						if (srv.getType().equalsIgnoreCase(type))
+							amount++;
+
+					if (amount < min) {
+						// Start servers
+						for (int i = 0; i < min - amount && nbr < limit; i++, nbr++)
+							openServer(type, srv -> {
+								LOG.info("Server id {} of type {} started !", srv.getId(), srv.getType());
+							}, () -> {
+								LOG.error("Error while starting server type {}", type);
+							});
+					}
+				}
+			}
+		});
+		vpsThread.start();
 	}
 
 	public Server getServer(String id) {
@@ -73,10 +117,10 @@ public class VPS {
 
 	public void openServer(String type, Consumer<Server> then, Runnable error) {
 		// Run _openServer every seconds until the action is executed
-		Scheduler.add(() -> _openServer(type, then) == null, error);
+		Scheduler.add(() -> _openServer(type, then, error) == null, error);
 	}
 
-	private Error _openServer(String type, Consumer<Server> then) {
+	private Error _openServer(String type, Consumer<Server> then, Runnable error) {
 		if (!isLinked()) {
 			LOG.error(Error.NOTCONNECTED.getError(), id);
 			return Error.NOTCONNECTED;
@@ -87,9 +131,10 @@ public class VPS {
 		while (tempServers.containsKey(randomUUID))
 			randomUUID = UUID.randomUUID();
 		// Save
-		TempServer ts = new TempServer(randomUUID, type, then);
+		TempServer ts = new TempServer(randomUUID, type, then, error);
 		tempServers.put(randomUUID, ts);
 		// Send message to VPS
+		LOG.debug("Trying to open server type {} with uuid {}", type, randomUUID.toString());
 		sendMessage("start", randomUUID.toString() + " " + type);
 		return null;
 	}
@@ -105,7 +150,16 @@ public class VPS {
 		}
 		// Send message to VPS
 		sendMessage("stop", id);
+		servers.remove(id);
 		return null;
+	}
+
+	public void registerServer(Server srv) {
+		servers.put(srv.getId(), srv);
+	}
+
+	public void unregisterServer(String id) {
+		servers.remove(id);
 	}
 
 	/**
@@ -115,15 +169,21 @@ public class VPS {
 	 * at the same time for the same machine<br />
 	 * We add 1 to avoid returning 0 if there is not servers running on this
 	 * vps<br />
-	 * Returns 0 if VPS is full or there is not WebSocket connection
+	 * Returns 0 if there is not WebSocket connection, VPS is full or vps has
+	 * reached maximum type
 	 * 
 	 * @return 1 + number of servers + 2 * number of temp servers
 	 */
-	public int getScore() {
-		if ((servers.size() + tempServers.size()) >= maxServers)
+	public int getScore(String type) {
+		if ((servers.size() + tempServers.size()) >= vps.getMaxServers())
 			return 0;
 		// Do not create a new server if it's not linked
 		if (!isLinked())
+			return 0;
+		// Do not create a server if maximum type is reached
+		int max = vps.getMax(type);
+		int count = count(type);
+		if (count >= max)
 			return 0;
 		return 1 + servers.size() + 2 * tempServers.size();
 	}
@@ -138,7 +198,7 @@ public class VPS {
 			if (!isLinked())
 				return false;
 			try {
-				webSocket.sendMessage("CORE", channel, message);
+				webSocket.sendCommand(channel, message);
 			} catch (Exception ex) {
 				LOG.error("Error while sending a message to VPS {} with channel {}", id, channel);
 				LOG.error("", ex);
@@ -146,15 +206,6 @@ public class VPS {
 			}
 			return true;
 		}, null);
-	}
-
-	/**
-	 * Called when this VPS has send a message to the Core
-	 * 
-	 * @param message The message sent by this VPS
-	 */
-	public void onMessage(String message) {
-		// TODO
 	}
 
 	/**
@@ -179,16 +230,105 @@ public class VPS {
 	}
 
 	/**
+	 * Check if specific uuid is a temp server created by this VPS
+	 * 
+	 * @param uuid The uuid of the temp server
+	 * @return true if this uuid is a temp server of this VPS
+	 */
+	public boolean hasTemp(UUID uuid) {
+		return tempServers.containsKey(uuid);
+	}
+
+	/**
+	 * Count the number of running and temp servers that is of specific type
+	 * 
+	 * @param type The type
+	 * @return The number of running and temp servers that are of specific type
+	 */
+	public int count(String type) {
+		int count = 0;
+		for (Server srv : servers.values())
+			if (srv.getType().equalsIgnoreCase(type))
+				count++;
+		return count;
+	}
+
+	/**
+	 * Manage this temp server<br />
+	 * Send an "error" message if uuid or id isn't linked to a server
+	 * 
+	 * @param uuid
+	 */
+	public void newServer(UUID uuid, String id) {
+		LOG.debug("newServer: id = {}, uuid {}", id, uuid.toString());
+		TempServer ts = tempServers.get(uuid);
+		if (ts == null) {
+			// Send stop command
+			sendMessage("stop", id);
+			return;
+		}
+		// Get id from REST
+		Main.get().getNetworkManager().getNetwork().getServerService().asyncGetServer(id,
+				new Callback<ServerDataOutput.Server>() {
+
+					@Override
+					public void onResponse(ServerDataOutput.Server response) {
+						// Okay, this server is now loaded (Let's check to be sure the VPS of this
+						// server)
+						if (!response.getVps().equalsIgnoreCase(getId())) {
+							LOG.error("Server {} doesn't have vps id {} but has {}", id, getId(), response.getVps());
+							sendMessage("stop", id);
+							return;
+						}
+						LOG.info("newServer: id = {}", id);
+						Server server = new Server(response, VPS.this);
+						servers.put(id, server);
+						tempServers.remove(uuid);
+						ts.then(server);
+						for (VPS vps : Main.get().getServerManager().getVps())
+							vps.sendMessage("new", id);
+					}
+
+					@Override
+					public void onFailure(RestException ex) {
+						LOG.error("Failure #{} while getting server {}", ex.getError().getErrorId(), id);
+						LOG.error("", ex);
+						sendMessage("stop", id);
+					}
+
+					@Override
+					public void onFatalFailure(Throwable t) {
+						LOG.error("Fatal Failure while getting server {}", id);
+						LOG.error("", t);
+						sendMessage("stop", id);
+					}
+				});
+	}
+
+	public void error(UUID uuid) {
+		TempServer ts = tempServers.remove(uuid);
+		if (ts == null)
+			return;
+		LOG.debug("newServer error on vps {}: uuid {}", id, uuid.toString());
+		ts.error();
+	}
+
+	/**
 	 * Unload this vps and close WebSocket connection
 	 */
 	public void unload() {
 		// Avoid unloading multiple time
 		if (close)
 			return;
-		LOG.info("Unloading vps {}", id);
 		close = true;
+		LOG.info("Unloading vps {}", id);
 		if (webSocket != null)
 			webSocket.disconnect();
+		vpsThread.interrupt();
 		LOG.info("VPS {} unloaded", id);
+	}
+
+	public int getMaxServers() {
+		return vps.getMaxServers();
 	}
 }

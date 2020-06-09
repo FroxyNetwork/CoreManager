@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import com.froxynetwork.coremanager.Main;
 import com.froxynetwork.coremanager.server.config.ServerVps;
+import com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput;
+import com.froxynetwork.froxynetwork.network.service.ServerService.Type;
 
 /**
  * MIT License
@@ -46,17 +48,26 @@ public class ServerManager {
 	}
 
 	/**
-	 * Remove WebSocket connection for all VPS, unload VPS and
+	 * Remove WebSocket connection for all VPS, unload VPS and load these
 	 */
 	public void reload() {
-		LOG.info("Reloading ...");
 		LOG.info("Unloading all VPS");
-		for (VPS vps : this.vps.values()) {
+		for (VPS vps : this.vps.values())
 			vps.unload();
-		}
-		for (ServerVps vps : Main.get().getServerConfigManager().getVps()) {
-			VPS v = new VPS(vps.getId(), vps.getHost(), vps.getPort(), vps.getMaxServers());
-			this.vps.put(vps.getId(), v);
+		LOG.info("Reloading VPS");
+		for (ServerVps vps : Main.get().getServerConfigManager().getVps())
+			this.vps.put(vps.getId(), new VPS(vps));
+		LOG.info("Loading servers");
+		try {
+			for (ServerDataOutput.Server srv : Main.get().getNetworkManager().getNetwork().getServerService()
+					.syncGetServers(Type.SERVER).getServers()) {
+				// TODO
+				String vpsId = srv.getVps();
+				VPS vps = this.vps.get(vpsId);
+				vps.registerServer(new Server(srv, vps));
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
 		}
 	}
 
@@ -70,6 +81,7 @@ public class ServerManager {
 	 * @param error
 	 */
 	public void openServer(String type, Consumer<Server> then, Consumer<Error> error) {
+		LOG.info("Trying to open server type {}", type);
 		// Check if type is a valid type
 		if (!Main.get().getServerConfigManager().exist(type)) {
 			LOG.error(Error.TYPENOTFOUND.getError(), type);
@@ -77,7 +89,7 @@ public class ServerManager {
 			return;
 		}
 		// Find an optimal VPS
-		VPS vps = findOptimalVPS();
+		VPS vps = findOptimalVPS(type);
 		if (vps == null) {
 			LOG.error(Error.FULL.getError(), type);
 			error.accept(Error.FULL);
@@ -124,11 +136,11 @@ public class ServerManager {
 	 * 
 	 * @return An optimal server
 	 */
-	public VPS findOptimalVPS() {
+	public VPS findOptimalVPS(String type) {
 		VPS v = null;
 		int score = 0;
 		for (VPS vps : this.vps.values()) {
-			int vpsScore = vps.getScore();
+			int vpsScore = vps.getScore(type);
 			if (vpsScore != 0 && (score == 0 || vpsScore < score)) {
 				v = vps;
 				score = vpsScore;

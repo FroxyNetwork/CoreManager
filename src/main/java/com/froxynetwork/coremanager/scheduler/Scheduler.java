@@ -35,7 +35,7 @@ import java.util.function.Supplier;
 public class Scheduler {
 	private static List<CustomScheduler> execute;
 	private static Thread runnable;
-	private static boolean stop;
+	private static boolean stop = false;
 
 	static {
 		start();
@@ -57,44 +57,17 @@ public class Scheduler {
 			execute.add(new CustomScheduler(exec, error));
 	}
 
-	/**
-	 * Stop this Scheduler and force stop if Scheduler is not dead after
-	 */
-	public static void stop() {
-		stop = true;
-		for (CustomScheduler cs : execute)
-			if (cs.getError() != null)
-				try {
-					cs.getError().run();
-				} catch (Exception ex) {
-					// Empty exception
-				}
-		execute.clear();
-		// Copy the runnable to avoid
-		Thread copyRunnable = runnable;
-		new Thread(() -> {
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException ex) {
-				ex.printStackTrace();
-			}
-			if (copyRunnable.isAlive())
-				copyRunnable.interrupt();
-		}).start();
-	}
-
 	public static void start() {
 		// Avoid starting when already running
-		if (!stop)
+		if (stop)
 			return;
-		stop = false;
 		execute = new ArrayList<>();
 		runnable = new Thread(() -> {
 			while (!stop) {
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException ex) {
-					ex.printStackTrace();
+					break;
 				}
 				List<CustomScheduler> execute = new ArrayList<>();
 				// To avoid ConcurrentModificationException
@@ -110,5 +83,22 @@ public class Scheduler {
 			}
 		});
 		runnable.start();
+	}
+
+	/**
+	 * Stop this Scheduler and call errors for each remaining schedulers
+	 */
+	public static void stop() {
+		stop = true;
+		if (runnable.isAlive())
+			runnable.interrupt();
+		for (CustomScheduler cs : execute)
+			if (cs.getError() != null)
+				try {
+					cs.getError().run();
+				} catch (Exception ex) {
+					// Empty exception
+				}
+		execute.clear();
 	}
 }

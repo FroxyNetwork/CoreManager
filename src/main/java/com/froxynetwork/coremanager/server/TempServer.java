@@ -40,14 +40,20 @@ public class TempServer {
 	@Getter
 	private String type;
 	private Consumer<Server> then;
+	private Runnable error;
 
-	public TempServer(UUID uuid, String type, Consumer<Server> then) {
+	public TempServer(UUID uuid, String type, Consumer<Server> then, Runnable error) {
 		this.uuid = uuid;
 		this.type = type;
 		this.then = then;
+		this.error = error;
 	}
 
 	public void then(Server srv) {
 		then.accept(srv);
+	}
+
+	public void error() {
+		error.run();
 	}
 }

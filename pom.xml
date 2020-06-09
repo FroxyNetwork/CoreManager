@@ -38,7 +38,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>com.froxynetwork.servermanager.Main</mainClass>
+							<mainClass>com.froxynetwork.coremanager.Main</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

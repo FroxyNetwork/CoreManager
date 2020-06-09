@@ -1,5 +1,10 @@
 package com.froxynetwork.coremanager.server;
 
+import java.util.Date;
+
+import com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput;
+import com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput.ServerStatus;
+
 import lombok.Getter;
 
 /**
@@ -30,13 +35,26 @@ import lombok.Getter;
 @Getter
 public class Server {
 	private String id;
-	private com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput.Server restServer;
+	private String name;
+	private String type;
 	private VPS vps;
+	private int port;
+	private ServerStatus status;
+	private Date creationTime;
+	private Date endTime;
 
-	public Server(String id,
-			com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput.Server restServer, VPS vps) {
-		this.id = id;
-		this.restServer = restServer;
+	public Server(ServerDataOutput.Server restServer, VPS vps) {
+		this.id = restServer.getId();
+		this.name = restServer.getName();
+		this.type = restServer.getType();
 		this.vps = vps;
+		this.port = restServer.getPort();
+		this.status = restServer.getStatus();
+		this.creationTime = restServer.getCreationTime();
+		this.endTime = restServer.getEndTime();
+	}
+
+	public void setStatus(ServerDataOutput.ServerStatus status) {
+		this.status = status;
 	}
 }

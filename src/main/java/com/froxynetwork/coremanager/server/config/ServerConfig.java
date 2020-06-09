@@ -11,7 +11,7 @@ import lombok.ToString;
 /**
  * MIT License
  *
- * Copyright (c) 2020 FroxyNetwork
+ * Copyright (c) 2019 FroxyNetwork
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,13 +40,17 @@ public class ServerConfig {
 	private String type;
 	private String[] database;
 	private List<ServerConfig> childrens;
+	private int min;
+	private int max;
 	@Setter
 	private ServerConfig parent;
 
-	public ServerConfig(String type, String[] database) {
+	public ServerConfig(String type, String[] database, int min, int max) {
 		this.type = type;
 		this.database = database;
 		this.childrens = new ArrayList<>();
+		this.min = min;
+		this.max = max;
 	}
 
 	public void addChildren(ServerConfig serverConfig) {

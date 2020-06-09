@@ -14,6 +14,7 @@ import com.froxynetwork.froxynetwork.network.output.Callback;
 import com.froxynetwork.froxynetwork.network.output.RestException;
 import com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput;
 import com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput.ServersConfig;
+import com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput.VpsConfigConfig;
 
 import lombok.Getter;
 
@@ -63,12 +64,12 @@ public class ServerConfigManager {
 		actuallyReloading = true;
 		LOG.info("Initializing Server Config");
 		// Call retrofit
-		HashMap<String, ServerConfig> newServersConfig = new HashMap<>();
 		Main.get().getNetworkManager().network().getServerConfigService()
 				.asyncGetServerConfig(new Callback<ServerConfigDataOutput.ServersConfig>() {
 
 					@Override
 					public void onResponse(ServersConfig response) {
+						HashMap<String, ServerConfig> newServersConfig = new HashMap<>();
 						try {
 							int countType = 0;
 							int countSubType = 0;
@@ -81,7 +82,7 @@ public class ServerConfigManager {
 
 								com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput.ServerConfig[] variants = sc
 										.getVariants();
-								ServerConfig newSc = new ServerConfig(id, database);
+								ServerConfig newSc = new ServerConfig(id, database, sc.getMin(), sc.getMax());
 								newServersConfig.put(id, newSc);
 								if (variants != null) {
 									for (com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput.ServerConfig variant : variants) {
@@ -100,7 +101,8 @@ public class ServerConfigManager {
 											System.arraycopy(vDatabase, 0, newDatabase, database.length,
 													vDatabase.length);
 										}
-										ServerConfig vServerConfig = new ServerConfig(vId, newDatabase);
+										ServerConfig vServerConfig = new ServerConfig(vId, newDatabase,
+												variant.getMin(), variant.getMax());
 										vServerConfig.setParent(newSc);
 										newSc.addChildren(vServerConfig);
 										newServersConfig.put(vId, vServerConfig);
@@ -115,8 +117,14 @@ public class ServerConfigManager {
 							serversConfig = newServersConfig;
 							List<ServerVps> newVps = new ArrayList<>();
 							for (com.froxynetwork.froxynetwork.network.output.data.server.config.ServerConfigDataOutput.VpsConfig vc : response
-									.getVps())
-								newVps.add(new ServerVps(vc.getId(), vc.getHost(), vc.getPort(), vc.getMaxServers()));
+									.getVps()) {
+								ServerVps vps = new ServerVps(vc.getId(), vc.getMaxServers());
+								for (VpsConfigConfig c : vc.getConfig()) {
+									vps.setMin(c.getType(), c.getMin());
+									vps.setMax(c.getType(), c.getMax());
+								}
+								newVps.add(vps);
+							}
 							// Save
 							vps = newVps;
 							LOG.info("Got {} vps", vps.size());
@@ -156,5 +164,12 @@ public class ServerConfigManager {
 
 	public Collection<ServerConfig> getAll() {
 		return serversConfig.values();
+	}
+
+	public ServerVps getVps(String vps) {
+		for (ServerVps v : this.vps)
+			if (v.getId().equalsIgnoreCase(vps))
+				return v;
+		return null;
 	}
 }

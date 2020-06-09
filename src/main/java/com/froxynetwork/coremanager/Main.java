@@ -8,6 +8,8 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.froxynetwork.coremanager.command.CommandManager;
+import com.froxynetwork.coremanager.scheduler.Scheduler;
 import com.froxynetwork.coremanager.server.ServerManager;
 import com.froxynetwork.coremanager.server.config.ServerConfigManager;
 import com.froxynetwork.coremanager.websocket.WebSocketManager;
@@ -50,13 +52,12 @@ public class Main {
 
 	@Getter
 	private NetworkManager networkManager;
-
 	@Getter
 	private ServerConfigManager serverConfigManager;
-
+	@Getter
+	private CommandManager commandManager;
 	@Getter
 	private ServerManager serverManager;
-
 	@Getter
 	private WebSocketManager webSocketManager;
 
@@ -93,7 +94,7 @@ public class Main {
 				// Initialize Servers once ServerConfig is initialized
 				initializeServer();
 				initializeWebSocket();
-//				initializeCommands();
+				initializeCommands();
 				LOG.info("All initialized");
 			});
 		} catch (Exception ex) {
@@ -155,16 +156,29 @@ public class Main {
 			LOG.error("websocketPort is not a number: {}", strWebsocketPort);
 			LOG.info("Using default websocketPort ({})", websocketPort);
 		}
-		webSocketManager = new WebSocketManager(websocketUrl, websocketPort, networkManager);
-		webSocketManager.start();
+		webSocketManager = new WebSocketManager(websocketUrl, websocketPort);
 		LOG.info("WebSocket initialized");
 	}
-//
-//	private void initializeCommands() {
-//		LOG.info("Initializing CommandManager");
-//		commandManager = new CommandManager();
-//		LOG.info("CommandManager initialized");
-//	}
+
+	private void initializeCommands() {
+		LOG.info("Initializing CommandManager");
+		commandManager = new CommandManager();
+		LOG.info("CommandManager initialized");
+	}
+
+	public void stop() {
+		LOG.info("Shutdowning WebSocket");
+		webSocketManager.stop();
+
+		LOG.info("Shutdowning NetworkManager");
+		networkManager.shutdown();
+
+		LOG.info("Shutdowning Scheduler");
+		Scheduler.stop();
+
+		// Exit
+		System.exit(0);
+	}
 
 	public static Main get() {
 		return INSTANCE;

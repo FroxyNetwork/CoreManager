@@ -1,6 +1,10 @@
 Incoming:
-
+> auth <id> <token>			<== Authenticate a ServerManager via WebSocket
+> register <uuid> <id>		<== Say to a ServerManager to create a new server
+> error <uuid>				<== When an error occured while creating specific server
 
 Outcoming:
+> auth						<== Say that specific server is authenticated
 > start <uuid> <type>		<== Start a new server
 > stop <id>					<== Stop a running server
+> new <id>					<== Register a new server
