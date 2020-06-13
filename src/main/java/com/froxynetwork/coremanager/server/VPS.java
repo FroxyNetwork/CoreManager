@@ -263,6 +263,8 @@ public class VPS {
 		LOG.debug("newServer: id = {}, uuid {}", id, uuid.toString());
 		TempServer ts = tempServers.get(uuid);
 		if (ts == null) {
+			LOG.error("Got new server with id = {} and uuid = {} but this uuid isn't listed, stopping this server", id,
+					uuid.toString());
 			// Send stop command
 			sendMessage("stop", id);
 			return;
@@ -286,7 +288,7 @@ public class VPS {
 						tempServers.remove(uuid);
 						ts.then(server);
 						for (VPS vps : Main.get().getServerManager().getVps())
-							vps.sendMessage("new", id);
+							vps.sendMessage("new", id + " " + response.getType());
 					}
 
 					@Override

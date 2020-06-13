@@ -41,11 +41,7 @@ import com.froxynetwork.froxynetwork.network.service.ServerService.Type;
 public class ServerManager {
 	private final Logger LOG = LoggerFactory.getLogger(getClass());
 
-	private HashMap<String, VPS> vps;
-
-	public ServerManager() {
-		vps = new HashMap<>();
-	}
+	private HashMap<String, VPS> vps = new HashMap<>();
 
 	/**
 	 * Remove WebSocket connection for all VPS, unload VPS and load these

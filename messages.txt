@@ -7,4 +7,4 @@ Outcoming:
 > auth						<== Say that specific server is authenticated
 > start <uuid> <type>		<== Start a new server
 > stop <id>					<== Stop a running server
-> new <id>					<== Register a new server
+> new <id> <type>			<== Register a new server
