@@ -195,7 +195,7 @@ public class VPS {
 	 */
 	public void sendMessage(String channel, String message) {
 		Scheduler.add(() -> {
-			if (!isLinked())
+			if (!isLinked() || !webSocket.isAuthenticated())
 				return false;
 			try {
 				webSocket.sendCommand(channel, message);
@@ -254,12 +254,12 @@ public class VPS {
 	}
 
 	/**
-	 * Manage this temp server<br />
+	 * Called by "register" request<br />
 	 * Send an "error" message if uuid or id isn't linked to a server
 	 * 
 	 * @param uuid
 	 */
-	public void newServer(UUID uuid, String id) {
+	public void onRegister(UUID uuid, String id) {
 		LOG.debug("newServer: id = {}, uuid {}", id, uuid.toString());
 		TempServer ts = tempServers.get(uuid);
 		if (ts == null) {
@@ -286,9 +286,11 @@ public class VPS {
 						Server server = new Server(response, VPS.this);
 						servers.put(id, server);
 						tempServers.remove(uuid);
-						ts.then(server);
+						// Notify all servers
 						for (VPS vps : Main.get().getServerManager().getVps())
-							vps.sendMessage("new", id + " " + response.getType());
+							vps.sendMessage("register", id + " " + response.getType());
+						// Execute then action
+						ts.then(server);
 					}
 
 					@Override
@@ -313,6 +315,14 @@ public class VPS {
 			return;
 		LOG.debug("newServer error on vps {}: uuid {}", id, uuid.toString());
 		ts.error();
+	}
+
+	public void onUnregister(String id, String type) {
+		// Remove from VPS and send a close request
+		for (VPS v : Main.get().getServerManager().getVps()) {
+			v.unregisterServer(id);
+			v.sendMessage("unregister", id + " " + type);
+		}
 	}
 
 	/**

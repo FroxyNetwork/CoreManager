@@ -97,6 +97,12 @@ public class ServerManager {
 		});
 	}
 
+	/**
+	 * Send a request to close specific server
+	 * 
+	 * @param id    The server to close
+	 * @param error
+	 */
 	public void closeServer(String id, Runnable error) {
 		// Find which vps has this id
 		for (VPS v : this.vps.values())
@@ -105,6 +111,22 @@ public class ServerManager {
 					LOG.error("Unknown error while closing server {} on vps {}", id, v.getId());
 					error.run();
 				});
+	}
+
+	/**
+	 * When a server has closed (called by the "unregister" request)
+	 * 
+	 * @param id The id of the server
+	 */
+	public void onUnregister(String id, String type) {
+		// Do not handle bungee
+		if ("BUNGEE".equalsIgnoreCase(type))
+			return;
+		// Remove from VPS and send a stop request
+		for (VPS v : this.vps.values()) {
+			v.unregisterServer(id);
+			v.sendMessage("unregister", id);
+		}
 	}
 
 	/**

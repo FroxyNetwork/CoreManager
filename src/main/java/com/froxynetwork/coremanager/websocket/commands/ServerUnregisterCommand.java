@@ -1,6 +1,5 @@
 package com.froxynetwork.coremanager.websocket.commands;
 
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.java_websocket.framing.CloseFrame;
@@ -37,33 +36,31 @@ import com.froxynetwork.froxynetwork.network.websocket.WebSocketServerImpl;
  * 
  * @author 0ddlyoko
  */
-public class ServerRegisterCommand implements IWebSocketCommander {
+public class ServerUnregisterCommand implements IWebSocketCommander {
 	private final Logger LOG = LoggerFactory.getLogger(getClass());
 	private Pattern spacePattern = Pattern.compile(" ");
 	private WebSocketServerImpl webSocket;
 
-	public ServerRegisterCommand(WebSocketServerImpl webSocket) {
+	public ServerUnregisterCommand(WebSocketServerImpl webSocket) {
 		this.webSocket = webSocket;
 	}
 
 	@Override
 	public String name() {
-		return "register";
+		return "unregister";
 	}
 
 	@Override
 	public String description() {
-		return "On server start";
+		return "On server close";
 	}
 
 	@Override
 	public void onReceive(String message) {
-		// register <uuid> <id>
-		if (message == null)
-			return;
+		// unregister <id> <type>
 		if (!webSocket.isAuthenticated()) {
 			// Server not authenticated
-			LOG.error("Got \"register {}\" from an unauthenticated server", message);
+			LOG.error("Got \"unregister {}\" from an unauthenticated server", message);
 			return;
 		}
 		String[] split = spacePattern.split(message);
@@ -72,14 +69,8 @@ public class ServerRegisterCommand implements IWebSocketCommander {
 			LOG.error("Invalid message: {}", message);
 			return;
 		}
-		UUID uuid = null;
-		try {
-			uuid = UUID.fromString(split[0]);
-		} catch (Exception ex) {
-			LOG.warn("{} is not a valid uuid", message);
-			return;
-		}
-		String id = split[1];
+		String id = split[0];
+		String type = split[1];
 
 		VPS vps = Main.get().getWebSocketManager().get(webSocket);
 		if (vps == null) {
@@ -88,6 +79,6 @@ public class ServerRegisterCommand implements IWebSocketCommander {
 			webSocket.disconnect(CloseFrame.NORMAL, "No VPS link found");
 			return;
 		}
-		vps.onRegister(uuid, id);
+		vps.onUnregister(id, type);
 	}
 }
