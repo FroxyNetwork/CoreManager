@@ -12,6 +12,7 @@ import com.froxynetwork.coremanager.Main;
 import com.froxynetwork.coremanager.server.VPS;
 import com.froxynetwork.coremanager.websocket.commands.ServerErrorCommand;
 import com.froxynetwork.coremanager.websocket.commands.ServerRegisterCommand;
+import com.froxynetwork.coremanager.websocket.commands.ServerUnregisterCommand;
 import com.froxynetwork.froxynetwork.network.websocket.WebSocketFactory;
 import com.froxynetwork.froxynetwork.network.websocket.WebSocketServer;
 import com.froxynetwork.froxynetwork.network.websocket.WebSocketServerImpl;
@@ -82,8 +83,9 @@ public class WebSocketManager {
 			vps.setWebSocket(wssi);
 			links.put(wssi, vps);
 		});
-		wssi.registerCommand(new ServerRegisterCommand(wssi));
 		wssi.registerCommand(new ServerErrorCommand(wssi));
+		wssi.registerCommand(new ServerRegisterCommand(wssi));
+		wssi.registerCommand(new ServerUnregisterCommand(wssi));
 		wssi.registerWebSocketDisconnection(remote -> {
 			links.remove(wssi);
 			Object obj = wssi.get(WebSocketTokenAuthentication.TOKEN);
