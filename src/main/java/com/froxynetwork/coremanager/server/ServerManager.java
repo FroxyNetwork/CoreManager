@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 
 import com.froxynetwork.coremanager.Main;
 import com.froxynetwork.coremanager.server.config.ServerVps;
+import com.froxynetwork.froxynetwork.network.output.Callback;
+import com.froxynetwork.froxynetwork.network.output.RestException;
+import com.froxynetwork.froxynetwork.network.output.data.EmptyDataOutput;
 import com.froxynetwork.froxynetwork.network.output.data.server.ServerDataOutput;
 import com.froxynetwork.froxynetwork.network.service.ServerService.Type;
 
@@ -53,13 +56,73 @@ public class ServerManager {
 		LOG.info("Reloading VPS");
 		for (ServerVps vps : Main.get().getServerConfigManager().getVps())
 			this.vps.put(vps.getId(), new VPS(vps));
+		LOG.info("Loading bungees");
+		try {
+			for (ServerDataOutput.Server srv : Main.get().getNetworkManager().getNetwork().getServerService()
+					.syncGetServers(Type.BUNGEE).getServers()) {
+				String vpsId = srv.getVps();
+				VPS vps = this.vps.get(vpsId);
+				if (vps == null) {
+					// VPS not found, close this server
+					LOG.error("Got bungee id {} that is not linked to a valid VPS ! (vpsId = {})", srv.getId(), vpsId);
+					Main.get().getNetworkManager().getNetwork().getServerService().asyncDeleteServer(srv.getId(),
+							new Callback<EmptyDataOutput.Empty>() {
+
+								@Override
+								public void onResponse(EmptyDataOutput.Empty response) {
+									// Okay
+								}
+
+								@Override
+								public void onFailure(RestException ex) {
+									LOG.error("Error while closing server {}", srv.getId());
+									LOG.error("", ex);
+								}
+
+								@Override
+								public void onFatalFailure(Throwable t) {
+									LOG.error("Fatal Error while closing server {}", srv.getId());
+									LOG.error("", t);
+								}
+							});
+					continue;
+				}
+				vps.registerServer(new Server(srv, vps));
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
 		LOG.info("Loading servers");
 		try {
 			for (ServerDataOutput.Server srv : Main.get().getNetworkManager().getNetwork().getServerService()
 					.syncGetServers(Type.SERVER).getServers()) {
-				// TODO
 				String vpsId = srv.getVps();
 				VPS vps = this.vps.get(vpsId);
+				if (vps == null) {
+					// VPS not found, close this server
+					LOG.error("Got server id {} that is not linked to a valid VPS ! (vpsId = {})", srv.getId(), vpsId);
+					Main.get().getNetworkManager().getNetwork().getServerService().asyncDeleteServer(srv.getId(),
+							new Callback<EmptyDataOutput.Empty>() {
+
+								@Override
+								public void onResponse(EmptyDataOutput.Empty response) {
+									// Okay
+								}
+
+								@Override
+								public void onFailure(RestException ex) {
+									LOG.error("Error while closing server {}", srv.getId());
+									LOG.error("", ex);
+								}
+
+								@Override
+								public void onFatalFailure(Throwable t) {
+									LOG.error("Fatal Error while closing server {}", srv.getId());
+									LOG.error("", t);
+								}
+							});
+					continue;
+				}
 				vps.registerServer(new Server(srv, vps));
 			}
 		} catch (Exception ex) {
@@ -94,7 +157,7 @@ public class ServerManager {
 		vps.openServer(type, then, () -> {
 			LOG.info("Unknown error while opening server type {} on vps {}", type, vps.getId());
 			error.accept(Error.UNKNOWN);
-		});
+		}, true);
 	}
 
 	/**

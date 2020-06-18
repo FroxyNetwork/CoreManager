@@ -52,6 +52,10 @@ public class VPS {
 	@Getter
 	private String id;
 	private ServerVps vps;
+	@Getter
+	@Setter
+	private Server bungee;
+	private boolean creatingBungee = false;
 	private HashMap<String, Server> servers;
 	private HashMap<UUID, TempServer> tempServers;
 	private boolean close;
@@ -79,6 +83,23 @@ public class VPS {
 					LOG.info("Got an interruptedException");
 					break;
 				}
+				// Don't check if VPS is not linked
+				if (!isLinked()) {
+					LOG.error("VPS {} is not linked !", id);
+					continue;
+				}
+				// Check bungee
+//				if (bungee == null && !creatingBungee) {
+//					// Ask to start the bungee
+//					creatingBungee = true;
+//					openServer("BUNGEE", bungee -> {
+//						LOG.info("Bungee started on VPS {}", id);
+//					}, () -> {
+//						LOG.error("Error while starting server type BUNGEE on vps {}", id);
+//						creatingBungee = false;
+//					}, false);
+//				}
+				
 //				// Check if the maximum amount of running server has been reached
 //				if (vps.getMaxServers() >= (servers.size() + tempServers.size()))
 //					continue;
@@ -102,8 +123,8 @@ public class VPS {
 							openServer(type, srv -> {
 								LOG.info("Server id {} of type {} started !", srv.getId(), srv.getType());
 							}, () -> {
-								LOG.error("Error while starting server type {}", type);
-							});
+								LOG.error("Error while starting server type {} on vps {}", type, id);
+							}, false);
 					}
 				}
 			}
@@ -115,9 +136,13 @@ public class VPS {
 		return servers.get(id);
 	}
 
-	public void openServer(String type, Consumer<Server> then, Runnable error) {
-		// Run _openServer every seconds until the action is executed
-		Scheduler.add(() -> _openServer(type, then, error) == null, error);
+	public void openServer(String type, Consumer<Server> then, Runnable error, boolean force) {
+		if (force) {
+			// Run _openServer every seconds until the action is executed
+			Scheduler.add(() -> _openServer(type, then, error) == null, error);
+		} else {
+			_openServer(type, then, error);
+		}
 	}
 
 	private Error _openServer(String type, Consumer<Server> then, Runnable error) {
@@ -261,7 +286,7 @@ public class VPS {
 	 */
 	public void onRegister(UUID uuid, String id) {
 		LOG.debug("newServer: id = {}, uuid {}", id, uuid.toString());
-		TempServer ts = tempServers.get(uuid);
+		TempServer ts = tempServers.remove(uuid);
 		if (ts == null) {
 			LOG.error("Got new server with id = {} and uuid = {} but this uuid isn't listed, stopping this server", id,
 					uuid.toString());
@@ -284,8 +309,10 @@ public class VPS {
 						}
 						LOG.info("newServer: id = {}", id);
 						Server server = new Server(response, VPS.this);
-						servers.put(id, server);
-						tempServers.remove(uuid);
+						if ("BUNGEE".equalsIgnoreCase(ts.getType()))
+							bungee = server;
+						else
+							servers.put(id, server);
 						// Notify all servers
 						for (VPS vps : Main.get().getServerManager().getVps())
 							vps.sendMessage("register", id + " " + response.getType());
