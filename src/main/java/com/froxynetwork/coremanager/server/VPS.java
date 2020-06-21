@@ -89,17 +89,18 @@ public class VPS {
 					continue;
 				}
 				// Check bungee
-//				if (bungee == null && !creatingBungee) {
-//					// Ask to start the bungee
-//					creatingBungee = true;
-//					openServer("BUNGEE", bungee -> {
-//						LOG.info("Bungee started on VPS {}", id);
-//					}, () -> {
-//						LOG.error("Error while starting server type BUNGEE on vps {}", id);
-//						creatingBungee = false;
-//					}, false);
-//				}
-				
+				if (bungee == null && !creatingBungee) {
+					// Ask to start the bungee
+					creatingBungee = true;
+					openServer("BUNGEE", bungee -> {
+						LOG.info("Bungee started on VPS {}", id);
+						creatingBungee = false;
+					}, () -> {
+						LOG.error("Error while starting server type BUNGEE on vps {}", id);
+						creatingBungee = false;
+					}, false);
+				}
+
 //				// Check if the maximum amount of running server has been reached
 //				if (vps.getMaxServers() >= (servers.size() + tempServers.size()))
 //					continue;
@@ -345,7 +346,14 @@ public class VPS {
 	}
 
 	public void onUnregister(String id, String type) {
-		// Remove from VPS and send a close request
+		// Remove from VPS
+		if ("BUNGEE".equalsIgnoreCase(type)) {
+			if (bungee != null && id.equalsIgnoreCase(bungee.getId()))
+				bungee = null;
+		} else {
+			servers.remove(id);
+		}
+		// Send a close request
 		for (VPS v : Main.get().getServerManager().getVps()) {
 			v.unregisterServer(id);
 			v.sendMessage("unregister", id + " " + type);
