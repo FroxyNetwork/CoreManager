@@ -1,0 +1,12 @@
+Incoming:
+> auth <id> <token>			<== Authenticate a ServerManager via WebSocket
+> error <uuid>				<== When an error occurred while creating specific server
+> register <uuid> <id>		<== A server has opened
+> unregister <id> <type>	<== A server has shutdowned
+
+Outcoming:
+> auth						<== Say that specific server is authenticated
+> start <uuid> <type>		<== Start a new server
+> stop <id>					<== Stop a running server
+> register <id> <type>		<== A server has opened
+> unregister <id> <type>	<== A server has shutdowned
