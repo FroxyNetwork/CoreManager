@@ -140,16 +140,16 @@ public class VPS {
 	public void openServer(String type, Consumer<Server> then, Runnable error, boolean force) {
 		if (force) {
 			// Run _openServer every seconds until the action is executed
-			Scheduler.add(() -> _openServer(type, then, error) == null, error);
+			Scheduler.add(() -> _openServer(type, then, error), error);
 		} else {
 			_openServer(type, then, error);
 		}
 	}
 
-	private Error _openServer(String type, Consumer<Server> then, Runnable error) {
+	private boolean _openServer(String type, Consumer<Server> then, Runnable error) {
 		if (!isLinked()) {
 			LOG.error(Error.NOTCONNECTED.getError(), id);
-			return Error.NOTCONNECTED;
+			return false;
 		}
 		// Generate unique id
 		UUID randomUUID = UUID.randomUUID();
@@ -162,22 +162,22 @@ public class VPS {
 		// Send message to VPS
 		LOG.debug("Trying to open server type {} with uuid {}", type, randomUUID.toString());
 		sendMessage("start", randomUUID.toString() + " " + type);
-		return null;
+		return true;
 	}
 
 	public void closeServer(String id, Runnable error) {
-		Scheduler.add(() -> _closeServer(id) == null, error);
+		Scheduler.add(() -> _closeServer(id), error);
 	}
 
-	private Error _closeServer(String id) {
+	private boolean _closeServer(String id) {
 		if (!isLinked()) {
 			LOG.error(Error.NOTCONNECTED.getError(), id);
-			return Error.NOTCONNECTED;
+			return false;
 		}
 		// Send message to VPS
 		sendMessage("stop", id);
 		servers.remove(id);
-		return null;
+		return true;
 	}
 
 	public void registerServer(Server srv) {
